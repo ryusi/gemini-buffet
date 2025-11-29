@@ -11,6 +11,7 @@ import {
   X,
   Home,
   Search,
+  LayoutDashboard,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -42,6 +43,12 @@ const Navigation = () => {
       path: "/bitcoin-power-law",
       icon: Bitcoin,
       description: "비트코인 시장버블지수",
+    },
+    {
+      name: "Crypto Dashboard",
+      path: "/crypto-dashboard",
+      icon: LayoutDashboard,
+      description: "실시간 시세 및 지표",
     },
   ];
 
