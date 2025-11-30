@@ -28,6 +28,7 @@ import {
   ArrowLeftRight,
   GitCompare,
   Info,
+  HelpCircle,
 } from "lucide-react";
 
 // --- Interfaces ---
@@ -218,18 +219,42 @@ const fetchPowerLawData = async (
 
 // --- Components ---
 
+const InfoTooltip = ({ text }: { text: string }) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <button
+        onMouseEnter={() => setIsVisible(true)}
+        onMouseLeave={() => setIsVisible(false)}
+        onClick={() => setIsVisible(!isVisible)}
+        className="ml-1 text-slate-500 hover:text-slate-300 transition-colors"
+      >
+        <HelpCircle size={16} />
+      </button>
+      {isVisible && (
+        <div className="absolute z-50 left-0 top-6 w-64 p-3 bg-slate-900 border border-slate-700 rounded-lg shadow-xl text-xs text-slate-300 leading-relaxed">
+          {text}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const KPICard = ({
   title,
   value,
   subtitle,
   icon: Icon,
   color,
+  tooltip,
 }: {
   title: string;
   value: string;
   subtitle: string;
   icon: any;
   color: string;
+  tooltip?: string;
 }) => {
   return (
     <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-6 hover:border-slate-600 transition-colors">
@@ -237,10 +262,104 @@ const KPICard = ({
         <div className={`p-2 rounded-lg ${color}`}>
           <Icon size={24} className="text-white" />
         </div>
-        <h3 className="text-sm font-medium text-slate-400">{title}</h3>
+        <h3 className="text-sm font-medium text-slate-400 flex items-center">
+          {title}
+          {tooltip && <InfoTooltip text={tooltip} />}
+        </h3>
       </div>
       <div className="text-2xl font-bold text-white mb-1">{value}</div>
       <div className="text-xs text-slate-500">{subtitle}</div>
+    </div>
+  );
+};
+
+const ZScoreBarChart = ({ score }: { score: number }) => {
+  const zones = [
+    { min: -3, max: -1, label: "매수 기회", color: "#059669", emoji: "💎" },
+    { min: -1, max: 0, label: "저평가", color: "#22c55e", emoji: "📈" },
+    { min: 0, max: 1, label: "적정", color: "#84cc16", emoji: "✅" },
+    { min: 1, max: 2, label: "과열", color: "#f59e0b", emoji: "⚠️" },
+    { min: 2, max: 2.5, label: "버블", color: "#ea580c", emoji: "🔥" },
+    { min: 2.5, max: 3, label: "극도 위험", color: "#dc2626", emoji: "💥" },
+  ];
+
+  const getCurrentZone = (s: number) => {
+    return zones.find((z) => s >= z.min && s < z.max) || zones[zones.length - 1];
+  };
+
+  const currentZone = getCurrentZone(score);
+
+  return (
+    <div className="w-full space-y-4">
+      {/* Z-Score Bar Visualization */}
+      <div className="relative h-16 bg-slate-900/50 rounded-lg overflow-hidden border border-slate-700">
+        {/* Background zones */}
+        <div className="absolute inset-0 flex">
+          {zones.map((zone, idx) => (
+            <div
+              key={idx}
+              className="flex-1 transition-all duration-300"
+              style={{ backgroundColor: zone.color, opacity: 0.3 }}
+            />
+          ))}
+        </div>
+
+        {/* Current position indicator */}
+        <div
+          className="absolute top-0 bottom-0 w-1 bg-white shadow-lg transition-all duration-1000 ease-out"
+          style={{
+            left: `${Math.max(0, Math.min(100, ((score + 3) / 6) * 100))}%`,
+            boxShadow: "0 0 20px rgba(255,255,255,0.8)",
+          }}
+        >
+          <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+            <div className="bg-white text-slate-900 px-2 py-1 rounded text-xs font-bold shadow-lg">
+              {score.toFixed(2)}σ
+            </div>
+          </div>
+        </div>
+
+        {/* Zone labels */}
+        <div className="absolute inset-0 flex items-center justify-around px-2 text-[10px] font-medium text-white/80">
+          {zones.map((zone, idx) => (
+            <div key={idx} className="text-center">
+              <div>{zone.emoji}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        {zones.map((zone, idx) => (
+          <div
+            key={idx}
+            className={`flex items-center gap-1.5 p-2 rounded-lg transition-all ${currentZone === zone
+              ? "bg-slate-700 ring-2 ring-white/30"
+              : "bg-slate-800/30"
+              }`}
+          >
+            <div
+              className="w-3 h-3 rounded-full flex-shrink-0"
+              style={{ backgroundColor: zone.color }}
+            />
+            <span className="text-slate-300 truncate">{zone.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Current Status */}
+      <div
+        className="p-4 rounded-lg text-center"
+        style={{ backgroundColor: `${currentZone.color}20` }}
+      >
+        <div className="text-2xl mb-1">{currentZone.emoji}</div>
+        <div className="text-lg font-bold text-white">{currentZone.label}</div>
+        <div className="text-sm text-slate-400 mt-1">
+          Z-Score: {score > 0 ? "+" : ""}
+          {score.toFixed(2)}σ
+        </div>
+      </div>
     </div>
   );
 };
@@ -459,21 +578,19 @@ export default function BitcoinPowerLawPage() {
             <div className="bg-slate-800 p-1 rounded-lg border border-slate-700 flex">
               <button
                 onClick={() => setActiveTab("BTC")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                  activeTab === "BTC"
-                    ? "bg-orange-600 text-white shadow-lg"
-                    : "text-slate-400 hover:text-white"
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === "BTC"
+                  ? "bg-orange-600 text-white shadow-lg"
+                  : "text-slate-400 hover:text-white"
+                  }`}
               >
                 <Bitcoin size={16} /> Bitcoin
               </button>
               <button
                 onClick={() => setActiveTab("ETH")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                  activeTab === "ETH"
-                    ? "bg-blue-600 text-white shadow-lg"
-                    : "text-slate-400 hover:text-white"
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeTab === "ETH"
+                  ? "bg-blue-600 text-white shadow-lg"
+                  : "text-slate-400 hover:text-white"
+                  }`}
               >
                 <Zap size={16} /> Ethereum
               </button>
@@ -497,6 +614,7 @@ export default function BitcoinPowerLawPage() {
               subtitle="Real-time Market Price"
               icon={activeTab === "BTC" ? Bitcoin : Zap}
               color={activeTab === "BTC" ? "bg-orange-600" : "bg-blue-600"}
+              tooltip="바이낸스 API에서 가져온 실시간 시장 가격입니다. 이 가격은 현재 거래소에서 형성되고 있는 실제 시장 가격을 나타냅니다."
             />
             <KPICard
               title="적정 가치 (Fair Value)"
@@ -506,12 +624,12 @@ export default function BitcoinPowerLawPage() {
               subtitle="Power Law Trendline"
               icon={Target}
               color="bg-emerald-600"
+              tooltip="Power Law 모델을 기반으로 계산된 이론적 적정 가격입니다. 역사적 데이터의 로그 회귀 분석을 통해 산출되며, 장기적인 가격 추세선을 나타냅니다."
             />
             <KPICard
               title="버블 지수 (Z-Score)"
-              value={`${
-                currentViewData.zScore > 0 ? "+" : ""
-              }${currentViewData.zScore.toFixed(2)} σ`}
+              value={`${currentViewData.zScore > 0 ? "+" : ""
+                }${currentViewData.zScore.toFixed(2)} σ`}
               subtitle="Standard Deviations from Trend"
               icon={Activity}
               color={
@@ -521,6 +639,7 @@ export default function BitcoinPowerLawPage() {
                     ? "bg-yellow-600"
                     : "bg-green-600"
               }
+              tooltip="현재 가격이 적정 가치에서 얼마나 벗어났는지를 표준편차(σ)로 나타낸 지표입니다. +2σ 이상이면 버블 위험, -1σ 이하면 저평가 구간을 의미합니다."
             />
             <KPICard
               title="시장 상태"
@@ -528,6 +647,7 @@ export default function BitcoinPowerLawPage() {
               subtitle={currentViewData.advice.split("(")[0].trim()}
               icon={Info}
               color="bg-slate-600"
+              tooltip="Z-Score를 기반으로 판단한 현재 시장 상태입니다. 고평가는 가격이 적정 가치보다 높은 상태, 저평가는 낮은 상태를 의미합니다."
             />
           </div>
         )}
@@ -683,11 +803,10 @@ export default function BitcoinPowerLawPage() {
                     상관계수 (Correlation):
                   </span>
                   <span
-                    className={`font-bold ${
-                      correlationCoefficient > 0.8
-                        ? "text-green-400"
-                        : "text-yellow-400"
-                    }`}
+                    className={`font-bold ${correlationCoefficient > 0.8
+                      ? "text-green-400"
+                      : "text-yellow-400"
+                      }`}
                   >
                     {correlationCoefficient.toFixed(3)}
                   </span>
@@ -773,23 +892,34 @@ export default function BitcoinPowerLawPage() {
 
           {/* Right Column: Gauges & Stats */}
           <div className="space-y-8">
-            {/* Bubble Gauge */}
-            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 flex flex-col items-center text-center">
-              <h2 className="text-xl font-bold text-white mb-2">
-                Market Bubble Index
+            {/* Z-Score Visualization */}
+            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                <Activity className="text-purple-400" size={20} />
+                버블 지수 (Z-Score)
               </h2>
-              <p className="text-sm text-slate-400 mb-4">
-                현재 {activeTab} 버블 위험도
+              <p className="text-sm text-slate-400 mb-6">
+                현재 {activeTab} 시장 상태 분석
               </p>
 
-              <BubbleGauge score={currentViewData?.zScore || 0} />
+              <ZScoreBarChart score={currentViewData?.zScore || 0} />
 
-              <div className="mt-2">
-                <div className="text-2xl font-bold text-white mb-1">
-                  {currentViewData?.advice.split("(")[0]}
-                </div>
-                <div className="text-sm text-slate-500">
-                  {currentViewData?.advice.match(/\((.*?)\)/)?.[1] || "Hold"}
+              <div className="mt-6 p-4 bg-slate-900/50 rounded-lg border border-slate-700/50">
+                <div className="text-xs text-slate-400 leading-relaxed">
+                  <strong className="text-slate-200">💡 해석 가이드:</strong>
+                  <br />
+                  Z-Score는 현재 가격이 장기 추세선에서 얼마나 벗어났는지를
+                  표준편차(σ)로 나타냅니다.
+                  <br />
+                  <br />
+                  • <strong className="text-green-400">-1σ 이하</strong>: 역사적
+                  저평가 구간
+                  <br />
+                  • <strong className="text-yellow-400">0~1σ</strong>: 정상 범위
+                  <br />
+                  • <strong className="text-orange-400">1~2σ</strong>: 과열 주의
+                  <br />• <strong className="text-red-400">2σ 이상</strong>: 버블
+                  위험
                 </div>
               </div>
             </div>
@@ -803,29 +933,33 @@ export default function BitcoinPowerLawPage() {
                 </h3>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-slate-700/50">
-                    <span className="text-slate-400 text-sm">
+                    <span className="text-slate-400 text-sm flex items-center">
                       Slope (기울기)
+                      <InfoTooltip text="로그 회귀선의 기울기입니다. 이 값이 클수록 시간에 따른 가격 상승률이 높다는 것을 의미합니다. Power Law의 지수(exponent)를 나타냅니다." />
                     </span>
                     <span className="font-mono text-white">
                       {currentViewData.stats.slope.toFixed(4)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-slate-700/50">
-                    <span className="text-slate-400 text-sm">
+                    <span className="text-slate-400 text-sm flex items-center">
                       R² (결정계수)
+                      <InfoTooltip text="모델의 설명력을 나타내는 지표입니다. 0~1 사이의 값을 가지며, 1에 가까울수록 데이터가 추세선에 잘 맞는다는 의미입니다. 0.8 이상이면 매우 높은 설명력을 의미합니다." />
                     </span>
                     <span
-                      className={`font-mono ${
-                        currentViewData.stats.rSquared > 0.8
-                          ? "text-green-400"
-                          : "text-yellow-400"
-                      }`}
+                      className={`font-mono ${currentViewData.stats.rSquared > 0.8
+                        ? "text-green-400"
+                        : "text-yellow-400"
+                        }`}
                     >
                       {currentViewData.stats.rSquared.toFixed(4)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-slate-700/50">
-                    <span className="text-slate-400 text-sm">Sigma (σ)</span>
+                    <span className="text-slate-400 text-sm flex items-center">
+                      Sigma (σ)
+                      <InfoTooltip text="표준편차로, 가격이 추세선에서 평균적으로 얼마나 벗어나는지를 나타냅니다. 이 값을 기준으로 ±1σ, ±2σ 밴드를 그려 과열/저평가 구간을 판단합니다." />
+                    </span>
                     <span className="font-mono text-white">
                       {currentViewData.stats.sigma.toFixed(4)}
                     </span>
